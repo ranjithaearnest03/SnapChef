@@ -1,4 +1,4 @@
-import { BookHeart, Camera } from 'lucide-react'
+﻿import { BookHeart, Camera } from 'lucide-react'
 
 interface Props {
   saved: number
@@ -18,7 +18,8 @@ export default function Header({ saved, onOpenCookbook }: Props) {
         <nav className="hidden items-center gap-7 text-sm font-semibold md:flex">
           <a className="hover:text-tomato" href="#why">The problem</a>
           <a className="hover:text-tomato" href="#how">How it works</a>
-          <a className="hover:text-tomato" href="#studio">Try it</a>
+          <a className="hover:text-tomato" href="#studio">Vision Studio</a>
+          <a className="hover:text-tomato" href="#pantry">My Pantry &amp; Chef</a>
           <a className="hover:text-tomato" href="#tech">Under the hood</a>
         </nav>
         <button onClick={onOpenCookbook} className="btn bg-butter !px-4 !py-2 text-sm" aria-label="Open saved recipes">

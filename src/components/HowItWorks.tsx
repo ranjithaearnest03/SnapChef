@@ -1,10 +1,25 @@
-import { motion } from 'framer-motion'
-import { Camera, ChefHat, ScanSearch } from 'lucide-react'
+﻿import { motion } from 'framer-motion'
+import { Camera, ChefHat, ShoppingBag } from 'lucide-react'
 
 const STEPS = [
-  { icon: Camera, title: 'Snap', text: 'Take or upload a photo of your fridge, pantry or countertop. No typing, no forms.', bg: 'bg-butter' },
-  { icon: ScanSearch, title: 'Detect', text: 'YOLOv8 finds every food item in the frame and turns boxes into a clean ingredient list you can tweak.', bg: 'bg-mint' },
-  { icon: ChefHat, title: 'Cook', text: 'An LLM chef writes a step-by-step recipe from what you actually have — scaled, timed, diet-aware.', bg: 'bg-blush' },
+  {
+    icon: Camera,
+    title: 'Snap & Detect',
+    text: 'Follow quick photo tips and snap your fridge or counter. Color-refined YOLOv8 identifies ingredients privately in your browser.',
+    bg: 'bg-butter',
+  },
+  {
+    icon: ShoppingBag,
+    title: 'Pantry & Select',
+    text: 'Detected foods are noted in your Pantry. Add multiple items in one go, manage quantities, and select what you want to cook with today.',
+    bg: 'bg-mint',
+  },
+  {
+    icon: ChefHat,
+    title: 'Recipe Creator',
+    text: 'The built-in recipe creator in your pantry crafts a delicious, timed, zero-waste meal using your exact selected ingredients.',
+    bg: 'bg-blush',
+  },
 ]
 
 export default function HowItWorks() {
@@ -13,7 +28,7 @@ export default function HowItWorks() {
       <div className="mx-auto max-w-7xl px-4 py-20 sm:px-6">
         <p className="label-mono text-tomato">How it works</p>
         <h2 className="font-display mt-3 max-w-3xl text-4xl font-black leading-[1.02] tracking-tight sm:text-6xl">
-          Three taps from <span className="italic">“what’s for dinner?”</span> to cooking.
+          Three simple steps from <span className="italic">“what’s in my fridge?”</span> to cooking.
         </h2>
         <div className="mt-12 grid gap-6 md:grid-cols-3">
           {STEPS.map((s, i) => (

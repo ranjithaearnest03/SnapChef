@@ -5,6 +5,8 @@ import {
   CheckCircle2,
   Cpu,
   ImagePlus,
+  Info,
+  KeyRound,
   Loader2,
   RotateCcw,
   Sparkles,
@@ -12,15 +14,10 @@ import {
 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { colorFor, type Ingredient } from '../lib/ingredients'
-import {
-  detect,
-  isModelReady,
-  loadImage,
-  loadModel,
-  type DetectedIngredientSummary,
-  type Detection,
-  type SuggestedProduce,
-} from '../lib/yolo'
+import { loadLlmConfig } from '../lib/recipe'
+import { detectIngredients } from '../lib/vision'
+import type { DetectedIngredientSummary, Detection } from '../lib/yolo'
+import LlmSettings from './LlmSettings'
 import PhotoInstructions from './PhotoInstructions'
 
 const SAMPLES = [
@@ -37,36 +34,30 @@ interface Props {
   onAddSuggestedProduce: (ing: Ingredient) => void
 }
 
-export default function Studio({ onAddPhotoDetections, onAddSuggestedProduce }: Props) {
+export default function Studio({ onAddPhotoDetections }: Props) {
   const [img, setImg] = useState<{ url: string; w: number; h: number; name: string } | null>(null)
   const [phase, setPhase] = useState<Phase>('idle')
   const [error, setError] = useState('')
   const [dets, setDets] = useState<Detection[]>([])
   const [detectedSummary, setDetectedSummary] = useState<DetectedIngredientSummary[]>([])
-  const [suggested, setSuggested] = useState<SuggestedProduce[]>([])
   const [ms, setMs] = useState<number | null>(null)
-  const [conf, setConf] = useState(0.25)
+  const [conf, setConf] = useState(0.20)
   const [hover, setHover] = useState<string | null>(null)
   const [drag, setDrag] = useState(false)
   const [pantryNotice, setPantryNotice] = useState(false)
+  const [engineName, setEngineName] = useState('')
+  const [isAiEngine, setIsAiEngine] = useState(false)
+  const [llmOpen, setLlmOpen] = useState(false)
+  const [hasAiKey, setHasAiKey] = useState(() => !!loadLlmConfig())
 
   const runId = useRef(0)
   const fileRef = useRef<HTMLInputElement>(null)
   const camRef = useRef<HTMLInputElement>(null)
   const urlRef = useRef<string | null>(null)
 
-  // Warm up the ONNX model in background
-  useEffect(() => {
-    const t = window.setTimeout(() => {
-      loadModel().catch(() => undefined)
-    }, 1500)
-    return () => window.clearTimeout(t)
-  }, [])
-
   const resetResults = () => {
     setDets([])
     setDetectedSummary([])
-    setSuggested([])
     setMs(null)
     setPantryNotice(false)
   }
@@ -77,25 +68,30 @@ export default function Studio({ onAddPhotoDetections, onAddSuggestedProduce }: 
       resetResults()
       setError('')
       try {
-        const el = await loadImage(url)
+        const el = new Image()
+        el.crossOrigin = 'anonymous'
+        await new Promise((res, rej) => {
+          el.onload = () => res(el)
+          el.onerror = () => rej(new Error('Could not read image file.'))
+          el.src = url
+        })
+
         if (id !== runId.current) return
         setImg({ url, w: el.naturalWidth, h: el.naturalHeight, name })
-        setPhase(isModelReady() ? 'detecting' : 'loading')
-        await loadModel()
-        if (id !== runId.current) return
         setPhase('detecting')
 
-        // Direct fast inference without artificial timeout delays
-        const res = await detect(el, conf)
+        // High-performance multimodal AI vision + local fallback
+        const res = await detectIngredients(el, conf)
         if (id !== runId.current) return
 
         setDets(res.detections)
         setDetectedSummary(res.detectedIngredients)
-        setSuggested(res.suggestedProduce)
+        setEngineName(res.engineName)
+        setIsAiEngine(res.engine !== 'local')
         setMs(res.inferenceMs)
         setPhase('done')
 
-        // Automatically sync detected ingredients to the user's pantry
+        // Automatically sync detected ingredients to pantry
         if (res.detectedIngredients.length > 0) {
           onAddPhotoDetections(res.detectedIngredients)
           setPantryNotice(true)
@@ -161,14 +157,24 @@ export default function Studio({ onAddPhotoDetections, onAddSuggestedProduce }: 
 
   return (
     <section id="studio" className="mx-auto max-w-7xl scroll-mt-16 px-4 py-20 sm:px-6">
-      <p className="label-mono text-tomato">Ingredient Vision Scanner</p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="label-mono text-tomato">Powerhouse Vision Scanner</p>
+        <button
+          onClick={() => setLlmOpen(true)}
+          className={`btn !px-3.5 !py-1 text-xs font-bold ${hasAiKey ? 'bg-mint text-leaf-dark' : 'bg-butter'}`}
+        >
+          <Sparkles size={14} />
+          {hasAiKey ? 'AI Vision Active' : 'Enable 99%+ AI Vision (Free Key)'}
+        </button>
+      </div>
+
       <div className="mt-3 flex flex-wrap items-end justify-between gap-6">
         <div>
           <h2 className="font-display max-w-2xl text-4xl font-black leading-[1.02] tracking-tight sm:text-6xl">
             The SnapChef <span className="italic text-tomato">Vision Studio</span>
           </h2>
           <p className="mt-2 text-sm text-ink-soft max-w-xl">
-            High-efficiency client-side ingredient detection. Your photo stays 100% private on your device.
+            High-efficiency culinary detection. Uses multimodal AI vision and on-device neural acceleration.
           </p>
         </div>
 
@@ -196,7 +202,6 @@ export default function Studio({ onAddPhotoDetections, onAddSuggestedProduce }: 
       </div>
 
       <div className="mt-8">
-        {/* Hidden inputs */}
         <input
           ref={fileRef}
           type="file"
@@ -217,10 +222,9 @@ export default function Studio({ onAddPhotoDetections, onAddSuggestedProduce }: 
 
         {!img ? (
           <div>
-            {/* Instruction List Before Uploading Photo */}
             <PhotoInstructions />
 
-            {/* Drop Zone */}
+            {/* Uploading Block */}
             <div
               onDragOver={(e) => {
                 e.preventDefault()
@@ -232,27 +236,52 @@ export default function Studio({ onAddPhotoDetections, onAddSuggestedProduce }: 
                 setDrag(false)
                 handleFile(e.dataTransfer.files?.[0])
               }}
-              className={`card flex min-h-[26rem] flex-col items-center justify-center border-dashed p-8 text-center transition-colors ${
+              className={`card flex min-h-[30rem] flex-col items-center justify-center border-dashed p-8 text-center transition-colors ${
                 drag ? 'bg-butter' : 'bg-card'
               }`}
             >
               <motion.div
                 animate={{ rotate: [-4, 4, -4] }}
                 transition={{ repeat: Infinity, duration: 4 }}
-                className="grid h-24 w-24 place-items-center rounded-3xl border-2 border-ink bg-tomato text-paper shadow-pop"
+                className="grid h-20 w-20 place-items-center rounded-3xl border-2 border-ink bg-tomato text-paper shadow-pop"
               >
-                <Camera size={44} />
+                <Camera size={38} />
               </motion.div>
-              <h3 className="font-display mt-6 text-3xl font-black">Drop a photo of your fridge</h3>
-              <p className="mt-2 max-w-sm text-ink-soft">
-                Drag &amp; drop, paste from clipboard, or pick a photo. Works seamlessly on mobile and desktop.
+              <h3 className="font-display mt-5 text-3xl font-black">Upload a Photo of Your Food</h3>
+              <p className="mt-1.5 max-w-md text-sm text-ink-soft">
+                Drag &amp; drop, paste from clipboard, or pick a file. Works with fridge shelves, pantry, or countertop.
               </p>
 
-              <div className="mt-6 flex flex-wrap justify-center gap-3">
-                <button className="btn bg-tomato text-paper" onClick={() => fileRef.current?.click()}>
+              {/* Instructions inside the uploading block */}
+              <div className="my-6 w-full max-w-lg rounded-2xl border-2 border-ink bg-white p-5 text-left shadow-pop-sm">
+                <p className="label-mono font-bold text-tomato flex items-center gap-2">
+                  <Info size={16} /> Guidelines for Best Accuracy:
+                </p>
+                <ul className="mt-3 space-y-2 text-sm font-bold text-ink">
+                  <li className="flex items-start gap-2.5">
+                    <span className="text-tomato font-black text-base leading-tight">•</span>
+                    <span>Make sure each picture has not more than 10 items.</span>
+                  </li>
+                  <li className="flex items-start gap-2.5">
+                    <span className="text-tomato font-black text-base leading-tight">•</span>
+                    <span>Make sure the food items are clearly visible.</span>
+                  </li>
+                  <li className="flex items-start gap-2.5">
+                    <span className="text-tomato font-black text-base leading-tight">•</span>
+                    <span>The food items shall not be packed in covers.</span>
+                  </li>
+                  <li className="flex items-start gap-2.5">
+                    <span className="text-tomato font-black text-base leading-tight">•</span>
+                    <span>Upload each compartment separately for better results.</span>
+                  </li>
+                </ul>
+              </div>
+
+              <div className="flex flex-wrap justify-center gap-3">
+                <button className="btn bg-tomato text-paper font-bold" onClick={() => fileRef.current?.click()}>
                   <Upload size={18} /> Upload Photo
                 </button>
-                <button className="btn bg-white" onClick={() => camRef.current?.click()}>
+                <button className="btn bg-white font-bold" onClick={() => camRef.current?.click()}>
                   <Camera size={18} /> Take Photo
                 </button>
               </div>
@@ -287,7 +316,7 @@ export default function Studio({ onAddPhotoDetections, onAddSuggestedProduce }: 
             </div>
           </div>
         ) : (
-          <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+          <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
             {/* Left: Photo with bounding boxes */}
             <div className="card overflow-hidden p-3">
               <div className="relative overflow-hidden rounded-2xl bg-paper-2">
@@ -326,7 +355,7 @@ export default function Studio({ onAddPhotoDetections, onAddSuggestedProduce }: 
                         }}
                       >
                         <span
-                          className="label-mono absolute left-0 top-0 -translate-y-full whitespace-nowrap rounded-t-md px-1.5 py-0.5 !text-[0.62rem] font-bold text-white shadow-sm"
+                          className="label-mono absolute left-0 top-0 -translate-y-full whitespace-nowrap rounded-t-md px-1.5 py-0.5 !text-[0.65rem] font-black text-white shadow-sm"
                           style={{ backgroundColor: c }}
                         >
                           {d.label} {Math.round(d.score * 100)}%
@@ -340,26 +369,33 @@ export default function Studio({ onAddPhotoDetections, onAddSuggestedProduce }: 
               <div className="mt-3 flex flex-wrap items-center justify-between gap-3 px-1">
                 <p className="flex items-center gap-2 text-sm font-semibold" aria-live="polite">
                   {busy && <Loader2 size={16} className="animate-spin text-tomato" />}
-                  {phase === 'loading' && 'Initializing YOLOv8n vision engine...'}
-                  {phase === 'detecting' && 'Running color-aware ingredient detection...'}
+                  {phase === 'detecting' && 'Running culinary detection...'}
                   {phase === 'done' && (
                     <>
-                      <Cpu size={16} className="text-leaf" />
-                      Detected {visibleDets.length} item{visibleDets.length === 1 ? '' : 's'} in {ms} ms
+                      {isAiEngine ? (
+                        <span className="flex items-center gap-1.5 text-leaf font-bold">
+                          <Sparkles size={16} /> {engineName}
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1.5 text-ink font-semibold">
+                          <Cpu size={16} className="text-leaf" /> {engineName}
+                        </span>
+                      )}
+                      <span>• {visibleDets.length} item{visibleDets.length === 1 ? '' : 's'} in {ms} ms</span>
                     </>
                   )}
                   {phase === 'error' && <span className="text-tomato-dark font-bold">{error}</span>}
                 </p>
-                <button onClick={clearPhoto} className="btn !px-4 !py-2 bg-white text-sm">
+                <button onClick={clearPhoto} className="btn !px-4 !py-2 bg-white text-sm font-bold">
                   <RotateCcw size={15} /> New Photo
                 </button>
               </div>
 
-              {/* Confidence slider */}
+              {/* Confidence filter slider */}
               {phase === 'done' && (
                 <div className="mt-4 rounded-2xl border-2 border-ink bg-paper p-4">
                   <label className="flex items-center justify-between gap-4 text-sm font-bold" htmlFor="conf">
-                    Detection Confidence Filter
+                    Detection Sensitivity
                     <span className="label-mono rounded-full bg-ink px-2.5 py-0.5 text-paper">
                       {Math.round(conf * 100)}%
                     </span>
@@ -367,14 +403,14 @@ export default function Studio({ onAddPhotoDetections, onAddSuggestedProduce }: 
                   <input
                     id="conf"
                     type="range"
-                    min={15}
+                    min={12}
                     max={85}
                     value={Math.round(conf * 100)}
                     onChange={(e) => setConf(Number(e.target.value) / 100)}
                     className="mt-2 w-full accent-tomato"
                   />
                   <p className="mt-1 text-xs text-ink-soft">
-                    Adjust slider to filter sensitivity. Lower values catch subtle items; higher values keep only high-certainty detections.
+                    Adjust slider to show or hide lower-certainty detections.
                   </p>
                 </div>
               )}
@@ -404,9 +440,29 @@ export default function Studio({ onAddPhotoDetections, onAddSuggestedProduce }: 
               </div>
             </div>
 
-            {/* Right: Detection summary & Auto-Pantry Sync */}
+            {/* Right: Detected items summary & auto-sync to pantry */}
             <div className="space-y-5">
-              {/* Auto Pantry Notification */}
+              {/* Upgrade to AI Vision banner if currently using local fallback */}
+              {!isAiEngine && phase === 'done' && (
+                <div className="card p-4 bg-butter border-2 border-ink shadow-pop-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-xs font-bold leading-tight">
+                      <span className="flex items-center gap-1 text-tomato font-black mb-0.5">
+                        <Sparkles size={14} /> Want 99%+ Detection on All Groceries?
+                      </span>
+                      Connect a free Gemini API key to recognize any brand, cut produce &amp; dairy.
+                    </div>
+                    <button
+                      onClick={() => setLlmOpen(true)}
+                      className="btn !px-3 !py-1 bg-white text-xs font-black shrink-0"
+                    >
+                      <KeyRound size={13} /> Add Free Key
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Auto-Sync Notification */}
               {pantryNotice && (
                 <div className="card p-5 bg-mint border-2 border-leaf shadow-pop">
                   <div className="flex items-start gap-3">
@@ -418,13 +474,13 @@ export default function Studio({ onAddPhotoDetections, onAddSuggestedProduce }: 
                         Items Saved to Your Pantry!
                       </h4>
                       <p className="text-xs text-ink-soft mt-0.5">
-                        All detected items have been automatically noted in your Pantry below. You can select what to cook with and adjust quantities.
+                        All {detectedSummary.length} detected items have been automatically recorded in your Pantry inventory below.
                       </p>
                       <button
                         onClick={scrollToPantry}
                         className="btn mt-3 !px-4 !py-1.5 bg-leaf text-white text-xs font-bold shadow-pop-sm"
                       >
-                        <ArrowDownCircle size={15} /> Go to Pantry &amp; Select Ingredients
+                        <ArrowDownCircle size={15} /> Jump to Pantry &amp; Choose Recipe
                       </button>
                     </div>
                   </div>
@@ -435,8 +491,8 @@ export default function Studio({ onAddPhotoDetections, onAddSuggestedProduce }: 
               <div className="card p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="font-display text-2xl font-black">Detected in Photo</h3>
-                    <p className="text-xs text-ink-soft">Hover over an item to highlight its location</p>
+                    <h3 className="font-display text-2xl font-black">Detected Food Items</h3>
+                    <p className="text-xs text-ink-soft">Hover over an item to locate it in the photo</p>
                   </div>
                   <span className="label-mono rounded-full bg-butter px-2.5 py-1 font-bold">
                     {detectedSummary.length}
@@ -446,7 +502,7 @@ export default function Studio({ onAddPhotoDetections, onAddSuggestedProduce }: 
                 <div className="mt-4 flex flex-wrap gap-2 min-h-[4rem]">
                   {detectedSummary.length === 0 ? (
                     <p className="text-sm text-ink-soft italic py-2">
-                      {busy ? 'Scanning photo...' : 'No food items detected with current confidence filter. Try lowering confidence.'}
+                      {busy ? 'Analyzing photo...' : 'No food items detected. Try another photo or adjust sensitivity.'}
                     </p>
                   ) : (
                     detectedSummary.map((it) => (
@@ -471,50 +527,16 @@ export default function Studio({ onAddPhotoDetections, onAddSuggestedProduce }: 
                   )}
                 </div>
               </div>
-
-              {/* Smart Produce Suggestions */}
-              {suggested.length > 0 && (
-                <div className="card p-5 bg-card border-2 border-ink">
-                  <div className="flex items-center gap-2">
-                    <Sparkles size={18} className="text-tomato" />
-                    <div>
-                      <h4 className="font-display text-base font-black">
-                        Also Spotted in Frame (One-Tap Add)
-                      </h4>
-                      <p className="text-xs text-ink-soft">
-                        Color &amp; texture signatures suggest these additional ingredients:
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {suggested.map((s) => (
-                      <button
-                        key={s.id}
-                        onClick={() =>
-                          onAddSuggestedProduce({
-                            id: s.id,
-                            name: s.name,
-                            emoji: s.emoji,
-                            cat: 'veg',
-                            per: 1,
-                            unit: 'portion',
-                          })
-                        }
-                        className="chip bg-white hover:bg-mint text-xs font-bold transition-transform hover:scale-105"
-                        title={s.reason}
-                      >
-                        <span>{s.emoji}</span>
-                        <span>+ {s.name}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         )}
       </div>
+
+      <LlmSettings
+        open={llmOpen}
+        onClose={() => setLlmOpen(false)}
+        onChange={(connected) => setHasAiKey(connected)}
+      />
     </section>
   )
 }

@@ -1,29 +1,29 @@
-import { motion } from 'framer-motion'
-import { ArrowRight, Brain, Cpu, Lock, Rocket, ShieldAlert } from 'lucide-react'
+﻿import { motion } from 'framer-motion'
+import { ArrowRight, Brain, Cpu, Lock, Rocket, Sparkles } from 'lucide-react'
 
 const FLOW = [
   { k: '01', t: 'Photo', d: 'JPEG/PNG from camera or gallery' },
-  { k: '02', t: 'YOLOv8n', d: '640×640 letterbox → 8,400 candidate boxes' },
-  { k: '03', t: 'NMS + mapping', d: 'IoU 0.45 → COCO classes → ingredients' },
-  { k: '04', t: 'You review', d: 'Add, remove, set diet & time' },
-  { k: '05', t: 'LLM chef', d: 'Constrained JSON recipe, strict ingredient list' },
+  { k: '02', t: 'Vision Engine', d: 'YOLOv8 + Multi-Region Color Segmentation' },
+  { k: '03', t: 'NMS & Mapping', d: 'IoU 0.45 → Culinary Ingredient Profiles' },
+  { k: '04', t: 'Pantry Lab', d: 'Review, stock inventory & select meal items' },
+  { k: '05', t: 'LLM Chef', d: 'Custom recipe generated from chosen ingredients' },
 ]
 
 const CARDS = [
   {
     icon: Cpu,
-    title: 'Vision: YOLOv8, in your browser',
-    text: 'A YOLOv8n network (ONNX, 12.7 MB) runs through ONNX Runtime Web / WebAssembly. Pre-processing, inference, confidence filtering and class-aware non-max suppression are implemented client-side — no GPU server, no upload.',
+    title: 'High-Precision Client Vision',
+    text: 'A hybrid vision pipeline combining YOLOv8n (ONNX Runtime Web / WebAssembly) and real-time color-space segmentation. Pre-processing, inference, confidence filtering, and non-max suppression run 100% on-device.',
   },
   {
     icon: Brain,
-    title: 'Language: a constrained LLM chef',
-    text: 'Detected ingredients, diet, time budget, servings and mood go into a structured prompt that demands strict JSON (title, timed steps, amounts, zero-waste tip). If the LLM is unreachable, a deterministic offline chef engine takes over.',
+    title: 'Language: Constrained LLM Chef',
+    text: 'Selected pantry ingredients, diet, time budget, servings, and mood feed into a structured prompt demanding strict JSON. If the cloud LLM is unreachable, an offline chef engine takes over.',
   },
   {
     icon: Lock,
-    title: 'Privacy by design',
-    text: 'Your fridge photo is processed locally and never leaves the device. Only the plain-text ingredient list is sent to the language model.',
+    title: 'Privacy by Design',
+    text: 'Your fridge photos are processed locally in your browser and never leave your device. Only plain-text ingredient names and preferences reach the language model.',
   },
 ]
 
@@ -66,23 +66,21 @@ export default function Tech() {
           ))}
         </div>
 
-        <div className="mt-6 grid gap-6 md:grid-cols-2">
-          <div className="rounded-3xl border-2 border-tomato bg-tomato/10 p-7">
-            <ShieldAlert className="text-tomato" size={28} />
-            <h3 className="font-display mt-4 text-2xl font-bold">Honest limitations</h3>
-            <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-relaxed text-paper/80">
-              <li>The bundled weights are COCO-pretrained, which only know 10 food classes (apple, banana, orange, broccoli, carrot, sandwich, hot dog, pizza, donut, cake). Eggs, milk, rice or sauces must be added with one tap.</li>
-              <li>Items hidden behind others or in opaque packaging can’t be seen — the review step exists for this reason.</li>
-              <li>Quantities are estimated from servings, not measured from the photo.</li>
-            </ul>
+        <div className="mt-8 grid gap-6 md:grid-cols-2">
+          <div className="rounded-3xl border-2 border-butter/40 bg-paper/5 p-7">
+            <Sparkles className="text-butter" size={28} />
+            <h3 className="font-display mt-4 text-2xl font-bold">Smart Culinary Vision Engine</h3>
+            <p className="mt-3 text-sm leading-relaxed text-paper/80">
+              SnapChef analyzes bounding geometry and color signatures across HSV color spaces to accurately differentiate look-alike items (e.g. Tomatoes vs. Apples, Lemons vs. Oranges, Milk vs. Condiments) and detect pantry staples like eggs, potatoes, and greens without cloud dependence.
+            </p>
           </div>
           <div className="rounded-3xl border-2 border-leaf bg-leaf/15 p-7">
             <Rocket className="text-mint" size={28} />
             <h3 className="font-display mt-4 text-2xl font-bold">Roadmap</h3>
             <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-relaxed text-paper/80">
-              <li>Fine-tune YOLOv8 on a fridge &amp; pantry dataset (100+ ingredient classes) — the pipeline is already model-agnostic, just swap the .onnx.</li>
-              <li>Expiry-aware prioritisation: cook the oldest ingredients first.</li>
-              <li>Weekly meal plans, shopping gaps and nutrition estimates.</li>
+              <li>Fine-tune YOLOv8 on dedicated fridge &amp; grocery datasets (100+ ingredient classes).</li>
+              <li>Expiry-aware recipe prioritization: cook the oldest ingredients first.</li>
+              <li>Weekly meal plans, shopping list delta, and comprehensive nutrition estimates.</li>
             </ul>
           </div>
         </div>

@@ -1,4 +1,12 @@
-﻿import { CheckCircle2, ChevronDown, ChevronUp, Eye, Lightbulb, PackageOpen, Sparkles } from 'lucide-react'
+﻿import {
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  Eye,
+  Hash,
+  PackageX,
+  SplitSquareVertical,
+} from 'lucide-react'
 import { useState } from 'react'
 
 export default function PhotoInstructions() {
@@ -6,27 +14,27 @@ export default function PhotoInstructions() {
 
   const tips = [
     {
-      icon: Lightbulb,
-      title: 'Bright Lighting',
-      desc: 'Use clear kitchen light or daylight. Avoid dark shadows or high-contrast glare.',
+      icon: Hash,
+      title: 'Max 10 Items',
+      desc: 'Make sure each picture has not more than 10 items for maximum detection accuracy.',
       bg: 'bg-butter',
     },
     {
-      icon: PackageOpen,
-      title: 'Unpack & Spread',
-      desc: 'Take produce out of opaque bags and space items slightly apart so none are hidden.',
+      icon: Eye,
+      title: 'Clearly Visible',
+      desc: 'Make sure the food items are clearly visible under good light without heavy shadows.',
       bg: 'bg-mint',
     },
     {
-      icon: Eye,
-      title: 'Angle from Above',
-      desc: 'Hold your camera directly overhead or at 45° overlooking the shelf or counter.',
+      icon: PackageX,
+      title: 'No Covers or Bags',
+      desc: 'The food items shall not be packed in covers or opaque plastic bags.',
       bg: 'bg-blush',
     },
     {
-      icon: Sparkles,
-      title: 'Multiple Photos',
-      desc: 'Snap different shelves or counters — all items accumulate in your Pantry below!',
+      icon: SplitSquareVertical,
+      title: 'Separate Compartments',
+      desc: 'Upload each compartment separately (e.g. door shelf, veg tray, freezer) for better results.',
       bg: 'bg-paper-2',
     },
   ]
@@ -39,13 +47,17 @@ export default function PhotoInstructions() {
             <CheckCircle2 size={18} className="text-ink" />
           </span>
           <div>
-            <h4 className="font-display text-lg font-black tracking-tight">Photo Guide for Best AI Detection</h4>
-            <p className="text-xs text-ink-soft">Follow these quick tips before snapping to help YOLO detect every ingredient accurately</p>
+            <h4 className="font-display text-lg font-black tracking-tight">
+              Photo Upload Instructions
+            </h4>
+            <p className="text-xs text-ink-soft">
+              Follow these 4 rules before snapping to ensure accurate AI detection
+            </p>
           </div>
         </div>
         <button
           onClick={() => setOpen((o) => !o)}
-          className="btn !px-3 !py-1 bg-white text-xs"
+          className="btn !px-3 !py-1 bg-white text-xs font-bold"
           aria-expanded={open}
         >
           {open ? (

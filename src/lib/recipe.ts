@@ -45,16 +45,26 @@ export interface LlmConfig {
 }
 
 export const LLM_PRESETS: { label: string; baseUrl: string; model: string }[] = [
+  { label: 'Google Gemini (Free & Best)', baseUrl: 'https://generativelanguage.googleapis.com/v1beta', model: 'gemini-2.0-flash' },
   { label: 'OpenAI', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
   { label: 'Groq', baseUrl: 'https://api.groq.com/openai/v1', model: 'llama-3.3-70b-versatile' },
-  { label: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1', model: 'openai/gpt-4o-mini' },
+  { label: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1', model: 'google/gemini-2.0-flash-exp:free' },
 ]
 
 export function loadLlmConfig(): LlmConfig | null {
   try {
     const raw = localStorage.getItem(LLM_KEY)
     const c = raw ? (JSON.parse(raw) as LlmConfig) : null
-    return c && c.apiKey && c.baseUrl && c.model ? c : null
+    if (c && c.apiKey && c.baseUrl && c.model) return c
+    const envKey = import.meta.env.VITE_GEMINI_API_KEY
+    if (envKey) {
+      return {
+        baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
+        model: 'gemini-2.0-flash',
+        apiKey: envKey,
+      }
+    }
+    return null
   } catch {
     return null
   }
@@ -107,6 +117,65 @@ interface LlmShape {
 async function generateWithLLM(items: Ingredient[], p: Prefs, prevTitle: string | undefined, cfg: LlmConfig | null): Promise<Recipe> {
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), 45000)
+
+  if (cfg && (cfg.baseUrl.includes('googleapis') || cfg.apiKey.startsWith('AIza'))) {
+    try {
+      const gUrl = `https://generativelanguage.googleapis.com/v1beta/models/${cfg.model || 'gemini-2.0-flash'}:generateContent?key=${cfg.apiKey}`
+      const res = await fetch(gUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: ctrl.signal,
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: buildPrompt(items, p, prevTitle) }] }],
+          generationConfig: { responseMimeType: 'application/json' },
+        }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        const gText = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? ''
+        const r = extractJson(gText) as LlmShape
+        if (r.title && Array.isArray(r.ingredients) && Array.isArray(r.steps) && r.steps.length >= 3) {
+          const ingText = r.ingredients.map((i) => String(i.item).toLowerCase()).join(' | ')
+          const used = items.filter((i) => {
+            const n = i.name.toLowerCase().replace('leftover ', '')
+            const stem = n.endsWith('s') ? n.slice(0, -1) : n
+            return ingText.includes(stem)
+          }).length
+          const minutes = Math.round(
+            r.totalMinutes && r.totalMinutes > 0 ? r.totalMinutes : r.steps.reduce((a, s) => a + (s.minutes ?? 3), 0),
+          )
+          clearTimeout(timer)
+          return {
+            id: uid(),
+            title: String(r.title),
+            tagline: String(r.tagline ?? ''),
+            minutes,
+            servings: p.servings,
+            difficulty: r.difficulty === 'Medium' ? 'Medium' : 'Easy',
+            ingredients: r.ingredients.map((i) => ({
+              item: String(i.item),
+              amount: String(i.amount ?? ''),
+              have: Boolean(i.fromPhoto ?? true),
+            })),
+            steps: r.steps.map((s, idx) => ({
+              title: s.title ? String(s.title) : `Step ${idx + 1}`,
+              text: String(s.text),
+              minutes: s.minutes,
+            })),
+            tip: String(r.zeroWasteTip ?? ''),
+            source: 'llm',
+            used,
+            total: items.length,
+            skipped: [],
+            createdAt: Date.now(),
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Gemini recipe call failed, falling back to standard LLM / offline:', e)
+    }
+  }
+
   const url = cfg ? `${cfg.baseUrl.replace(/\/$/, '')}/chat/completions` : PUBLIC_LLM
   const call = (json: boolean) =>
     fetch(url, {
